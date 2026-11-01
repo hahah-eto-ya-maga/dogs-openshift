@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: dogs
+      POSTGRES_USER: dogs
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Run bash scripts/setup.sh first}
+    volumes:
+      - dog-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U dogs -d dogs']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  init:
+    build: .
+    image: dogs-app:local
+    command: [python, -m, app.manage, init]
+    environment: &db-env
+      DB_HOST: db
+      DB_NAME: dogs
+      DB_USER: dogs
+      DB_PASSWORD: ${DB_PASSWORD:?Run bash scripts/setup.sh first}
+    depends_on:
+      db:
+        condition: service_healthy
+  web:
+    build: .
+    image: dogs-app:local
+    environment:
+      <<: *db-env
+      WELCOME_MESSAGE: 'Каждой собаке нужен дом'
+    ports:
+      - '127.0.0.1:${APP_PORT:-8080}:8080'
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8080/readyz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+volumes:
+  dog-data:

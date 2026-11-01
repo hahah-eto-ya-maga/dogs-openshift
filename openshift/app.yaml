@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dogs
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dogs
+  template:
+    metadata:
+      labels:
+        app: dogs
+    spec:
+      serviceAccountName: dogs
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: DOGS_IMAGE
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: dogs-config
+            - secretRef:
+                name: dogs-secret
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 96Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            failureThreshold: 30
+            periodSeconds: 2
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            timeoutSeconds: 6
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dogs
+spec:
+  selector:
+    app: dogs
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: dogs
+spec:
+  to:
+    kind: Service
+    name: dogs
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: dogs
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: dogs

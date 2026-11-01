@@ -1,0 +1,69 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dogs-init
+spec:
+  backoffLimit: 5
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        app: dogs-job
+    spec:
+      restartPolicy: Never
+      serviceAccountName: dogs
+      automountServiceAccountToken: false
+      containers:
+        - name: init
+          image: DOGS_IMAGE
+          command: [python, -m, app.manage, init]
+          envFrom:
+            - configMapRef:
+                name: dogs-config
+            - secretRef:
+                name: dogs-secret
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: dogs-report
+spec:
+  schedule: '*/5 * * * *'
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 120
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: dogs-job
+        spec:
+          restartPolicy: Never
+          serviceAccountName: dogs
+          automountServiceAccountToken: false
+          containers:
+            - name: report
+              image: DOGS_IMAGE
+              command: [python, -m, app.manage, report]
+              envFrom:
+                - configMapRef:
+                    name: dogs-config
+                - secretRef:
+                    name: dogs-secret
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi

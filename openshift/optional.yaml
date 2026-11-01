@@ -1,0 +1,47 @@
+# Optional exercises: apply after the first successful deployment.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: dogs
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: dogs
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: dogs-defaults
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: '1'
+        memory: 1Gi
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: dogs-quota
+spec:
+  hard:
+    pods: '20'
+    requests.cpu: '4'
+    requests.memory: 4Gi
+    limits.cpu: '12'
+    limits.memory: 12Gi
+    requests.storage: 5Gi
+    persistentvolumeclaims: '3'

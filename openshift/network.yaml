@@ -1,0 +1,39 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: database-only-from-app
+spec:
+  podSelector:
+    matchLabels:
+      app: dogs-db
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: dogs
+        - podSelector:
+            matchLabels:
+              app: dogs-job
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: web-from-router-and-project
+spec:
+  podSelector:
+    matchLabels:
+      app: dogs
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              network.openshift.io/policy-group: ingress
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080
